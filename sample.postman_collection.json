@@ -1,0 +1,23 @@
+{
+  "info": { "name": "API Sample", "_postman_id": "demo-collection", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "item": [
+    {
+      "name": "Dummy Test",
+      "event": [{
+        "listen": "test",
+        "script": {
+          "exec": [
+            "pm.test(\"TC ID: 100001 [API]-Dummy test always passes\", function () {",
+            "   pm.expect(true).to.eql(true);",
+            "});"
+          ],
+          "type": "text/javascript"
+        }
+      }],
+      "request": {
+        "method": "GET",
+        "url": { "raw": "https://postman-echo.com/get", "protocol": "https", "host": ["postman-echo", "com"], "path": ["get"] }
+      }
+    }
+  ]
+}

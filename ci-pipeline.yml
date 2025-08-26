@@ -1,0 +1,82 @@
+# Azure DevOps YAML pipeline for running Postman, updating test links, and publishing results
+
+trigger: none
+
+schedules:
+  - cron: "30 3,11 * * *"
+    displayName: "Run at 9 AM and 5 PM IST"
+    branches:
+      include:
+        - master
+    always: "true"
+
+variables:
+  - name: vmImageName
+    value: 'windows-latest'
+  - name: reportXml
+    value: 'test-report.xml'
+  - name: htmlReport
+    value: 'postman-html-report.html'
+  - name: adoOrg
+    value: 'ADO_ORG_PLACEHOLDER'
+  - name: adoProject
+    value: 'ADO_PROJECT_PLACEHOLDER'
+  - name: testPlanId
+    value: 'ADO_TEST_PLAN_ID_PLACEHOLDER'
+  - name: suiteName
+    value: 'API Automation Suite'
+
+stages:
+  - stage: PostmanAndLink
+    displayName: Postman API Test + Link To ADO
+    jobs:
+      - job: APITests
+        displayName: Run API Tests & Sync to ADO
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '18.x'
+            displayName: 'Install Node.js'
+
+          - script: |
+              npm install -g newman newman-reporter-junitfull newman-reporter-htmlextra
+            displayName: 'Install Newman and Reporters'
+
+          - script: |
+              echo "Install node modules for scripts"
+              npm install xml2js axios uuid
+            displayName: 'Install Node Modules'  
+
+          - script: |
+              newman run sample.postman_collection.json -e postman_env.json -k -r cli,junit,htmlextra --reporter-junit-export "$(reportXml)" --reporter-htmlextra-export "$(htmlReport)"
+            displayName: 'Run Newman Tests'
+            continueOnError: "true"
+
+          - script: |
+              node run-and-update-tc.js
+            displayName: 'Sync Test Results with Azure DevOps'
+            env:
+              ADO_ORG: $(adoOrg)
+              ADO_PROJECT: $(adoProject)
+              ADO_TEST_PLAN_ID: $(testPlanId)
+              ADO_SUITE_NAME: $(suiteName)
+              JUNIT_PATH: $(reportXml)
+              ADO_PAT: $(ADO_PAT)
+            continueOnError: "true"
+
+          - task: PublishTestResults@2
+            displayName: 'Publish Test Results'
+            inputs:
+              testResultsFiles: '**/$(reportXml)'
+              testRunTitle: 'API Test Results'
+            condition: succeededOrFailed()
+
+          - task: PublishBuildArtifacts@1
+            displayName: Publish API HTML Report
+            condition: succeededOrFailed()
+            inputs:
+              pathtoPublish: '$(System.DefaultWorkingDirectory)/$(htmlReport)'
+              artifactName: 'API Test HTML Report'
+              publishLocation: Container
